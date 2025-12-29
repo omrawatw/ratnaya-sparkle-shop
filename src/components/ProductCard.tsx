@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Heart } from 'lucide-react';
+import { ShoppingBag, Heart, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from 'sonner';
@@ -28,38 +28,44 @@ const ProductCard = ({ id, name, price, original_price, image_url, category }: P
     e.preventDefault();
     e.stopPropagation();
     addToCart({ id, name, price, image_url });
-    toast.success(`${name} added to cart`);
+    toast.success(`${name} added to cart`, {
+      icon: <Sparkles className="w-4 h-4 text-gold" />,
+    });
   };
 
   const discount = original_price ? Math.round(((original_price - price) / original_price) * 100) : 0;
 
   return (
-    <Link to={`/product/${id}`} className="block">
-      <div className="group relative bg-card rounded-lg overflow-hidden border border-gold/10 hover:border-gold/30 transition-all duration-500 animate-fade-in cursor-pointer">
+    <Link to={`/product/${id}`} className="block group">
+      <div className="relative bg-card rounded-xl overflow-hidden border border-gold/10 transition-all duration-500 hover:border-gold/40 hover-lift hover-glow">
+        {/* Glow effect on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-gold/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+        
         {/* Image */}
         <div className="relative aspect-square overflow-hidden">
           <img
             src={image_url}
             alt={name}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110 group-hover:brightness-110"
           />
           
           {/* Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           
           {/* Discount Badge */}
           {discount > 0 && (
-            <span className="absolute top-3 left-3 bg-gold text-background text-xs font-bold px-2 py-1 rounded">
+            <span className="absolute top-4 left-4 bg-gradient-to-r from-gold to-gold-light text-background text-xs font-bold px-3 py-1.5 rounded-full shadow-gold animate-pulse-gold">
               -{discount}%
             </span>
           )}
 
           {/* Wishlist Button */}
           <button 
-            className="absolute top-3 right-3 w-8 h-8 bg-background/80 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-gold hover:text-background"
+            className="absolute top-4 right-4 w-10 h-10 bg-background/90 backdrop-blur-md rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-gold hover:text-background hover:scale-110 border border-gold/20"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              toast.success('Added to wishlist');
             }}
           >
             <Heart className="w-4 h-4" />
@@ -69,7 +75,7 @@ const ProductCard = ({ id, name, price, original_price, image_url, category }: P
           <Button
             variant="gold"
             size="sm"
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-4 group-hover:translate-y-0"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-6 group-hover:translate-y-0 shadow-gold-lg"
             onClick={handleAddToCart}
           >
             <ShoppingBag className="w-4 h-4 mr-2" />
@@ -78,14 +84,14 @@ const ProductCard = ({ id, name, price, original_price, image_url, category }: P
         </div>
 
         {/* Content */}
-        <div className="p-4">
-          <p className="text-gold/60 text-xs uppercase tracking-widest mb-1 font-body">
+        <div className="p-5 relative">
+          <p className="text-gold/70 text-xs uppercase tracking-[0.2em] mb-2 font-body">
             {category}
           </p>
-          <h3 className="font-display text-lg text-cream mb-2 line-clamp-1">
+          <h3 className="font-display text-lg text-cream mb-3 line-clamp-1 group-hover:text-gold transition-colors duration-300">
             {name}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <span className="text-gold font-display text-xl font-semibold">
               {formatPrice(price)}
             </span>
