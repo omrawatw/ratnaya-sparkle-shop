@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Menu, X } from 'lucide-react';
+import { ShoppingBag, Menu, X, User } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
-import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { totalItems } = useCart();
+  const { user } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-gold/20">
@@ -47,8 +48,20 @@ const Header = () => {
             </Link>
           </nav>
 
-          {/* Cart & Mobile Menu */}
+          {/* Cart, User & Mobile Menu */}
           <div className="flex items-center gap-4">
+            {user ? (
+              <Link to="/profile" className="flex items-center gap-2 text-cream hover:text-gold transition-colors">
+                <User className="w-6 h-6" />
+                <span className="hidden md:inline font-body text-sm">Profile</span>
+              </Link>
+            ) : (
+              <Link to="/auth" className="text-cream hover:text-gold transition-colors font-body text-sm">
+                <span className="hidden md:inline">Sign In</span>
+                <User className="w-6 h-6 md:hidden" />
+              </Link>
+            )}
+            
             <Link to="/cart" className="relative">
               <ShoppingBag className="w-6 h-6 text-cream hover:text-gold transition-colors" />
               {totalItems > 0 && (
@@ -99,6 +112,23 @@ const Header = () => {
               >
                 Contact
               </Link>
+              {user ? (
+                <Link 
+                  to="/profile" 
+                  className="text-gold hover:text-gold-light transition-colors font-body text-lg"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  My Profile
+                </Link>
+              ) : (
+                <Link 
+                  to="/auth" 
+                  className="text-gold hover:text-gold-light transition-colors font-body text-lg"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Sign In
+                </Link>
+              )}
             </div>
           </nav>
         )}
