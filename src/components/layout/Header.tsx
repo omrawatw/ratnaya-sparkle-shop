@@ -1,13 +1,16 @@
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Menu, X, User } from 'lucide-react';
+import { ShoppingBag, Menu, X, User, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWishlist } from '@/contexts/WishlistContext';
+import NotificationBell from '@/components/NotificationBell';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { totalItems } = useCart();
   const { user } = useAuth();
+  const { wishlistItems } = useWishlist();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-gold/20">
@@ -35,6 +38,12 @@ const Header = () => {
               Shop
             </Link>
             <Link 
+              to="/track-order" 
+              className="text-cream/80 hover:text-gold transition-colors font-body text-lg tracking-wide"
+            >
+              Track Order
+            </Link>
+            <Link 
               to="/about" 
               className="text-cream/80 hover:text-gold transition-colors font-body text-lg tracking-wide"
             >
@@ -48,8 +57,19 @@ const Header = () => {
             </Link>
           </nav>
 
-          {/* Cart, User & Mobile Menu */}
+          {/* Cart, Wishlist, Notifications, User & Mobile Menu */}
           <div className="flex items-center gap-4">
+            {user && <NotificationBell />}
+            
+            <Link to="/wishlist" className="relative">
+              <Heart className="w-6 h-6 text-cream hover:text-gold transition-colors" />
+              {wishlistItems.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-gold text-background text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {wishlistItems.length}
+                </span>
+              )}
+            </Link>
+            
             {user ? (
               <Link to="/profile" className="flex items-center gap-2 text-cream hover:text-gold transition-colors">
                 <User className="w-6 h-6" />
@@ -97,6 +117,20 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Shop
+              </Link>
+              <Link 
+                to="/track-order" 
+                className="text-cream/80 hover:text-gold transition-colors font-body text-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Track Order
+              </Link>
+              <Link 
+                to="/wishlist" 
+                className="text-cream/80 hover:text-gold transition-colors font-body text-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Wishlist
               </Link>
               <Link 
                 to="/about" 
