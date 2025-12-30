@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Package, Truck, CheckCircle, Clock, MapPin, ArrowLeft } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, MapPin, ArrowLeft, ShoppingBag } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Order {
   id: string;
@@ -45,10 +46,13 @@ const statusSteps = [
 
 const OrderTracking = () => {
   const { orderId } = useParams();
+  const { user } = useAuth();
   const [order, setOrder] = useState<Order | null>(null);
+  const [userOrders, setUserOrders] = useState<Order[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [statusHistory, setStatusHistory] = useState<StatusHistory[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingUserOrders, setLoadingUserOrders] = useState(false);
   const [searchId, setSearchId] = useState('');
   const [error, setError] = useState('');
 
@@ -57,6 +61,30 @@ const OrderTracking = () => {
       fetchOrder(orderId);
     }
   }, [orderId]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserOrders();
+    }
+  }, [user]);
+
+  const fetchUserOrders = async () => {
+    if (!user) return;
+    
+    setLoadingUserOrders(true);
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('customer_email', user.email)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching user orders:', error);
+    } else {
+      setUserOrders(data || []);
+    }
+    setLoadingUserOrders(false);
+  };
 
   const fetchOrder = async (id: string) => {
     setLoading(true);
@@ -121,9 +149,28 @@ const OrderTracking = () => {
     });
   };
 
+  const formatShortDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
   const getCurrentStepIndex = () => {
     if (!order) return -1;
     return statusSteps.findIndex(step => step.key === order.status);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'delivered': return 'text-green-400';
+      case 'shipped': return 'text-blue-400';
+      case 'processing': return 'text-yellow-400';
+      case 'confirmed': return 'text-gold';
+      case 'cancelled': return 'text-destructive';
+      default: return 'text-muted-foreground';
+    }
   };
 
   return (
@@ -138,7 +185,7 @@ const OrderTracking = () => {
           </Link>
 
           <h1 className="text-4xl md:text-5xl font-display font-bold text-cream mb-8 text-center">
-            Track Your Order
+            My Orders
           </h1>
 
           {/* Search Form */}
@@ -147,7 +194,7 @@ const OrderTracking = () => {
               <Input
                 value={searchId}
                 onChange={(e) => setSearchId(e.target.value)}
-                placeholder="Enter your Order ID"
+                placeholder="Enter Order ID to track"
                 className="bg-card border-gold/20 text-cream"
               />
               <Button type="submit" variant="gold" disabled={loading}>
@@ -162,8 +209,76 @@ const OrderTracking = () => {
             </div>
           )}
 
+          {/* User's Order History */}
+          {user && !order && (
+            <div className="max-w-4xl mx-auto mb-12">
+              <h2 className="text-2xl font-display text-cream mb-6">Your Order History</h2>
+              
+              {loadingUserOrders ? (
+                <div className="text-center text-cream">Loading your orders...</div>
+              ) : userOrders.length === 0 ? (
+                <div className="bg-card border border-gold/10 rounded-lg p-8 text-center">
+                  <ShoppingBag className="w-12 h-12 text-gold/50 mx-auto mb-4" />
+                  <p className="text-cream/70 font-body mb-4">You haven't placed any orders yet.</p>
+                  <Link to="/shop">
+                    <Button variant="gold">Start Shopping</Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userOrders.map((userOrder) => (
+                    <div 
+                      key={userOrder.id} 
+                      className="bg-card border border-gold/10 rounded-lg p-6 hover:border-gold/30 transition-colors cursor-pointer"
+                      onClick={() => fetchOrder(userOrder.id)}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <p className="text-gold font-body text-sm">Order #{userOrder.id.slice(0, 8).toUpperCase()}</p>
+                          <p className="text-cream font-display text-lg">{formatPrice(userOrder.total_amount)}</p>
+                          <p className="text-muted-foreground text-sm">{formatShortDate(userOrder.created_at)}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className={`capitalize font-body font-semibold ${getStatusColor(userOrder.status)}`}>
+                            {userOrder.status}
+                          </span>
+                          <p className="text-muted-foreground text-sm mt-1">{userOrder.city}, {userOrder.state}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Not logged in message */}
+          {!user && !order && (
+            <div className="max-w-2xl mx-auto text-center mb-12">
+              <div className="bg-card border border-gold/10 rounded-lg p-8">
+                <ShoppingBag className="w-12 h-12 text-gold/50 mx-auto mb-4" />
+                <p className="text-cream font-body mb-4">Sign in to view your order history</p>
+                <Link to="/auth">
+                  <Button variant="gold">Sign In</Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
           {order && (
             <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+              {/* Back to orders button */}
+              {user && userOrders.length > 0 && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setOrder(null)}
+                  className="text-gold hover:text-gold-light"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to All Orders
+                </Button>
+              )}
+
               {/* Order Status Timeline */}
               <div className="bg-card border border-gold/10 rounded-lg p-8">
                 <h2 className="text-2xl font-display text-cream mb-8">Order Status</h2>
