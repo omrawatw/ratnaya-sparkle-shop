@@ -5,7 +5,9 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
+import ProductReviews from '@/components/ProductReviews';
 import { useCart } from '@/contexts/CartContext';
+import { useWishlist } from '@/contexts/WishlistContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -23,6 +25,7 @@ interface Product {
 const ProductDetail = () => {
   const { id } = useParams();
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,9 +87,17 @@ const ProductDetail = () => {
     }
   };
 
+  const handleWishlistClick = () => {
+    if (product) {
+      toggleWishlist(product.id);
+    }
+  };
+
   const discount = product?.original_price 
     ? Math.round(((product.original_price - product.price) / product.original_price) * 100) 
     : 0;
+
+  const inWishlist = product ? isInWishlist(product.id) : false;
 
   if (loading) {
     return (
@@ -142,8 +153,15 @@ const ProductDetail = () => {
                   -{discount}% OFF
                 </span>
               )}
-              <button className="absolute top-4 right-4 w-12 h-12 bg-background/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-gold hover:text-background transition-all">
-                <Heart className="w-6 h-6" />
+              <button 
+                onClick={handleWishlistClick}
+                className={`absolute top-4 right-4 w-12 h-12 backdrop-blur-sm rounded-full flex items-center justify-center transition-all ${
+                  inWishlist 
+                    ? 'bg-gold text-background' 
+                    : 'bg-background/80 hover:bg-gold hover:text-background'
+                }`}
+              >
+                <Heart className={`w-6 h-6 ${inWishlist ? 'fill-current' : ''}`} />
               </button>
             </div>
 
@@ -210,8 +228,12 @@ const ProductDetail = () => {
                   <ShoppingBag className="w-5 h-5 mr-2" />
                   Add to Cart
                 </Button>
-                <Button variant="gold-outline" size="xl">
-                  <Heart className="w-5 h-5" />
+                <Button 
+                  variant={inWishlist ? "gold" : "gold-outline"} 
+                  size="xl"
+                  onClick={handleWishlistClick}
+                >
+                  <Heart className={`w-5 h-5 ${inWishlist ? 'fill-current' : ''}`} />
                 </Button>
               </div>
 
@@ -233,15 +255,18 @@ const ProductDetail = () => {
             </div>
           </div>
 
+          {/* Product Reviews */}
+          <ProductReviews productId={product.id} />
+
           {/* Related Products */}
           {relatedProducts.length > 0 && (
-            <div>
+            <div className="mt-16">
               <h2 className="text-3xl font-display font-bold text-cream mb-8 text-center gold-underline inline-block w-full">
                 You May Also Like
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {relatedProducts.map((product) => (
-                  <ProductCard key={product.id} {...product} />
+                  <ProductCard key={product.id} {...product} image_url={product.image_url || ''} />
                 ))}
               </div>
             </div>

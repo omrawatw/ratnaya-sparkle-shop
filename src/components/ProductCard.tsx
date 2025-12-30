@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, Heart, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/contexts/CartContext';
+import { useWishlist } from '@/contexts/WishlistContext';
 import { toast } from 'sonner';
 
 interface ProductCardProps {
@@ -15,6 +16,7 @@ interface ProductCardProps {
 
 const ProductCard = ({ id, name, price, original_price, image_url, category }: ProductCardProps) => {
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -33,7 +35,14 @@ const ProductCard = ({ id, name, price, original_price, image_url, category }: P
     });
   };
 
+  const handleWishlistClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleWishlist(id);
+  };
+
   const discount = original_price ? Math.round(((original_price - price) / original_price) * 100) : 0;
+  const inWishlist = isInWishlist(id);
 
   return (
     <Link to={`/product/${id}`} className="block group">
@@ -61,14 +70,14 @@ const ProductCard = ({ id, name, price, original_price, image_url, category }: P
 
           {/* Wishlist Button */}
           <button 
-            className="absolute top-4 right-4 w-10 h-10 bg-background/90 backdrop-blur-md rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-gold hover:text-background hover:scale-110 border border-gold/20"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              toast.success('Added to wishlist');
-            }}
+            className={`absolute top-4 right-4 w-10 h-10 backdrop-blur-md rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 border border-gold/20 ${
+              inWishlist 
+                ? 'bg-gold text-background' 
+                : 'bg-background/90 hover:bg-gold hover:text-background'
+            }`}
+            onClick={handleWishlistClick}
           >
-            <Heart className="w-4 h-4" />
+            <Heart className={`w-4 h-4 ${inWishlist ? 'fill-current' : ''}`} />
           </button>
 
           {/* Quick Add Button */}
