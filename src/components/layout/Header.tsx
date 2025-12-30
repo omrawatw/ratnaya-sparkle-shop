@@ -41,7 +41,7 @@ const Header = () => {
               to="/track-order" 
               className="text-cream/80 hover:text-gold transition-colors font-body text-lg tracking-wide"
             >
-              Track Order
+              My Orders
             </Link>
             <Link 
               to="/about" 
@@ -123,7 +123,7 @@ const Header = () => {
                 className="text-cream/80 hover:text-gold transition-colors font-body text-lg"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Track Order
+                My Orders
               </Link>
               <Link 
                 to="/wishlist" 
