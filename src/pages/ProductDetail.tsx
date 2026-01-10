@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingBag, Heart, ArrowLeft, Truck, Shield, RotateCcw } from 'lucide-react';
+import { ShoppingBag, Heart, ArrowLeft, Truck, Shield, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Button } from '@/components/ui/button';
@@ -22,11 +22,19 @@ interface Product {
   stock: number;
 }
 
+interface ProductImage {
+  id: string;
+  image_url: string;
+  display_order: number;
+}
+
 const ProductDetail = () => {
   const { id } = useParams();
   const { addToCart } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const [product, setProduct] = useState<Product | null>(null);
+  const [productImages, setProductImages] = useState<ProductImage[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -46,6 +54,20 @@ const ProductDetail = () => {
       } else {
         setProduct(data);
         
+        // Fetch product images
+        const { data: images } = await supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', data.id)
+          .order('display_order');
+        
+        if (images && images.length > 0) {
+          setProductImages(images);
+        } else if (data.image_url) {
+          // Fallback to main image if no gallery images
+          setProductImages([{ id: 'main', image_url: data.image_url, display_order: 0 }]);
+        }
+        
         // Fetch related products from same category
         const { data: related } = await supabase
           .from('products')
@@ -58,12 +80,27 @@ const ProductDetail = () => {
       }
       
       setLoading(false);
+      setSelectedImageIndex(0);
     };
 
     if (id) {
       fetchProduct();
     }
   }, [id]);
+
+  const currentImage = productImages[selectedImageIndex]?.image_url || product?.image_url || '/placeholder.svg';
+
+  const nextImage = () => {
+    if (productImages.length > 1) {
+      setSelectedImageIndex((prev) => (prev + 1) % productImages.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (productImages.length > 1) {
+      setSelectedImageIndex((prev) => (prev - 1 + productImages.length) % productImages.length);
+    }
+  };
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -139,15 +176,58 @@ const ProductDetail = () => {
           </Link>
 
           <div className="grid lg:grid-cols-2 gap-12 mb-20">
-            {/* Product Image */}
+            {/* Product Images Gallery */}
             <div className="relative animate-fade-in">
-              <div className="aspect-square overflow-hidden rounded-lg bg-card">
+              {/* Main Image */}
+              <div className="aspect-square overflow-hidden rounded-lg bg-card relative">
                 <img
-                  src={product.image_url || '/placeholder.svg'}
+                  src={currentImage}
                   alt={product.name}
                   className="w-full h-full object-cover"
                 />
+                
+                {/* Navigation Arrows */}
+                {productImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-background/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-background transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-cream" />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-background/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-background transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5 text-cream" />
+                    </button>
+                  </>
+                )}
               </div>
+              
+              {/* Thumbnail Gallery */}
+              {productImages.length > 1 && (
+                <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                  {productImages.map((img, index) => (
+                    <button
+                      key={img.id}
+                      onClick={() => setSelectedImageIndex(index)}
+                      className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                        index === selectedImageIndex 
+                          ? 'border-gold' 
+                          : 'border-transparent hover:border-gold/50'
+                      }`}
+                    >
+                      <img
+                        src={img.image_url}
+                        alt={`${product.name} ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              
               {discount > 0 && (
                 <span className="absolute top-4 left-4 bg-gold text-background text-sm font-bold px-3 py-1 rounded">
                   -{discount}% OFF
