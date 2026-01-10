@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X } from 'lucide-react';
+import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X, Megaphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,14 +55,29 @@ interface OrderItem {
   price: number;
 }
 
+interface OfferBanner {
+  id: string;
+  title: string;
+  description: string | null;
+  background_color: string;
+  text_color: string;
+  link_url: string | null;
+  link_text: string | null;
+  is_active: boolean;
+  display_order: number;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAdmin();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [banners, setBanners] = useState<OfferBanner[]>([]);
   const [loading, setLoading] = useState(true);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingBanner, setEditingBanner] = useState<OfferBanner | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
@@ -76,6 +91,18 @@ const AdminDashboard = () => {
     stock: '',
     featured: false,
   });
+
+  const [bannerForm, setBannerForm] = useState({
+    title: '',
+    description: '',
+    background_color: '#D4AF37',
+    text_color: '#1A1A2E',
+    link_url: '',
+    link_text: '',
+    is_active: true,
+    display_order: 0,
+  });
+
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<{ url: string; isNew: boolean; id?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -92,13 +119,15 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     
-    const [productsRes, ordersRes] = await Promise.all([
+    const [productsRes, ordersRes, bannersRes] = await Promise.all([
       supabase.from('products').select('*').order('created_at', { ascending: false }),
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
+      supabase.from('offer_banners').select('*').order('display_order'),
     ]);
 
     if (productsRes.data) setProducts(productsRes.data);
     if (ordersRes.data) setOrders(ordersRes.data);
+    if (bannersRes.data) setBanners(bannersRes.data);
     
     setLoading(false);
   };
@@ -345,6 +374,105 @@ const AdminDashboard = () => {
     }
   };
 
+  // Banner handlers
+  const resetBannerForm = () => {
+    setBannerForm({
+      title: '',
+      description: '',
+      background_color: '#D4AF37',
+      text_color: '#1A1A2E',
+      link_url: '',
+      link_text: '',
+      is_active: true,
+      display_order: 0,
+    });
+    setEditingBanner(null);
+  };
+
+  const handleEditBanner = (banner: OfferBanner) => {
+    setEditingBanner(banner);
+    setBannerForm({
+      title: banner.title,
+      description: banner.description || '',
+      background_color: banner.background_color,
+      text_color: banner.text_color,
+      link_url: banner.link_url || '',
+      link_text: banner.link_text || '',
+      is_active: banner.is_active,
+      display_order: banner.display_order,
+    });
+    setBannerDialogOpen(true);
+  };
+
+  const handleSubmitBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const bannerData = {
+      title: bannerForm.title,
+      description: bannerForm.description || null,
+      background_color: bannerForm.background_color,
+      text_color: bannerForm.text_color,
+      link_url: bannerForm.link_url || null,
+      link_text: bannerForm.link_text || null,
+      is_active: bannerForm.is_active,
+      display_order: bannerForm.display_order,
+    };
+
+    if (editingBanner) {
+      const { error } = await supabase
+        .from('offer_banners')
+        .update(bannerData)
+        .eq('id', editingBanner.id);
+
+      if (error) {
+        toast.error('Failed to update banner');
+        return;
+      }
+      toast.success('Banner updated successfully');
+    } else {
+      const { error } = await supabase
+        .from('offer_banners')
+        .insert(bannerData);
+
+      if (error) {
+        toast.error('Failed to add banner');
+        return;
+      }
+      toast.success('Banner added successfully');
+    }
+
+    setBannerDialogOpen(false);
+    resetBannerForm();
+    fetchData();
+  };
+
+  const handleDeleteBanner = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this banner?')) return;
+
+    const { error } = await supabase.from('offer_banners').delete().eq('id', id);
+
+    if (error) {
+      toast.error('Failed to delete banner');
+      return;
+    }
+
+    toast.success('Banner deleted successfully');
+    fetchData();
+  };
+
+  const toggleBannerActive = async (id: string, isActive: boolean) => {
+    const { error } = await supabase
+      .from('offer_banners')
+      .update({ is_active: isActive })
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Failed to update banner');
+      return;
+    }
+    fetchData();
+  };
+
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -415,6 +543,10 @@ const AdminDashboard = () => {
             </TabsTrigger>
             <TabsTrigger value="orders" className="data-[state=active]:bg-gold data-[state=active]:text-background">
               Orders
+            </TabsTrigger>
+            <TabsTrigger value="banners" className="data-[state=active]:bg-gold data-[state=active]:text-background">
+              <Megaphone className="w-4 h-4 mr-1" />
+              Banners
             </TabsTrigger>
           </TabsList>
 
@@ -763,6 +895,205 @@ const AdminDashboard = () => {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Banners Tab */}
+          <TabsContent value="banners">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-display text-cream">Offer Banners</h2>
+              <Dialog open={bannerDialogOpen} onOpenChange={(open) => {
+                setBannerDialogOpen(open);
+                if (!open) resetBannerForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button variant="gold">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Banner
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-gold/20 max-w-lg max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-cream font-display">
+                      {editingBanner ? 'Edit Banner' : 'Add New Banner'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmitBanner} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-cream">Title *</Label>
+                      <Input
+                        value={bannerForm.title}
+                        onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                        required
+                        placeholder="e.g., 🎉 Flash Sale!"
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-cream">Description</Label>
+                      <Input
+                        value={bannerForm.description}
+                        onChange={(e) => setBannerForm({ ...bannerForm, description: e.target.value })}
+                        placeholder="e.g., Get 20% off on all necklaces"
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-cream">Background Color</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="color"
+                            value={bannerForm.background_color}
+                            onChange={(e) => setBannerForm({ ...bannerForm, background_color: e.target.value })}
+                            className="w-12 h-10 p-1 bg-muted border-gold/20"
+                          />
+                          <Input
+                            value={bannerForm.background_color}
+                            onChange={(e) => setBannerForm({ ...bannerForm, background_color: e.target.value })}
+                            className="bg-muted border-gold/20 text-cream flex-1"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-cream">Text Color</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="color"
+                            value={bannerForm.text_color}
+                            onChange={(e) => setBannerForm({ ...bannerForm, text_color: e.target.value })}
+                            className="w-12 h-10 p-1 bg-muted border-gold/20"
+                          />
+                          <Input
+                            value={bannerForm.text_color}
+                            onChange={(e) => setBannerForm({ ...bannerForm, text_color: e.target.value })}
+                            className="bg-muted border-gold/20 text-cream flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-cream">Link URL</Label>
+                        <Input
+                          value={bannerForm.link_url}
+                          onChange={(e) => setBannerForm({ ...bannerForm, link_url: e.target.value })}
+                          placeholder="/shop"
+                          className="bg-muted border-gold/20 text-cream"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-cream">Link Text</Label>
+                        <Input
+                          value={bannerForm.link_text}
+                          onChange={(e) => setBannerForm({ ...bannerForm, link_text: e.target.value })}
+                          placeholder="Shop Now"
+                          className="bg-muted border-gold/20 text-cream"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-cream">Display Order</Label>
+                      <Input
+                        type="number"
+                        value={bannerForm.display_order}
+                        onChange={(e) => setBannerForm({ ...bannerForm, display_order: parseInt(e.target.value) || 0 })}
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={bannerForm.is_active}
+                        onCheckedChange={(checked) => setBannerForm({ ...bannerForm, is_active: checked })}
+                      />
+                      <Label className="text-cream">Active</Label>
+                    </div>
+                    
+                    {/* Preview */}
+                    <div className="space-y-2">
+                      <Label className="text-cream">Preview</Label>
+                      <div 
+                        className="p-3 rounded-lg text-center"
+                        style={{ 
+                          backgroundColor: bannerForm.background_color,
+                          color: bannerForm.text_color 
+                        }}
+                      >
+                        <span className="font-bold mr-2">{bannerForm.title || 'Banner Title'}</span>
+                        <span className="text-sm opacity-90">{bannerForm.description}</span>
+                        {bannerForm.link_text && (
+                          <span className="ml-2 underline text-sm">{bannerForm.link_text}</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <Button type="submit" variant="gold" className="w-full">
+                      {editingBanner ? 'Update Banner' : 'Add Banner'}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading...</div>
+            ) : banners.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Megaphone className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No banners yet. Create your first offer banner!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {banners.map((banner) => (
+                  <div 
+                    key={banner.id} 
+                    className="bg-card border border-gold/10 rounded-lg p-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div 
+                        className="w-16 h-10 rounded flex items-center justify-center text-xs font-bold"
+                        style={{ 
+                          backgroundColor: banner.background_color,
+                          color: banner.text_color 
+                        }}
+                      >
+                        Preview
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-cream font-display">{banner.title}</p>
+                        {banner.description && (
+                          <p className="text-muted-foreground text-sm">{banner.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={banner.is_active}
+                          onCheckedChange={(checked) => toggleBannerActive(banner.id, checked)}
+                        />
+                        <span className={`text-xs ${banner.is_active ? 'text-green-400' : 'text-muted-foreground'}`}>
+                          {banner.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditBanner(banner)}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteBanner(banner.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </TabsContent>
