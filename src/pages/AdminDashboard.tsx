@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye } from 'lucide-react';
+import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -69,6 +69,10 @@ const AdminDashboard = () => {
     stock: '',
     featured: false,
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -109,6 +113,8 @@ const AdminDashboard = () => {
       featured: false,
     });
     setEditingProduct(null);
+    setImageFile(null);
+    setImagePreview(null);
   };
 
   const handleEditProduct = (product: Product) => {
@@ -123,18 +129,77 @@ const AdminDashboard = () => {
       stock: product.stock.toString(),
       featured: product.featured,
     });
+    setImageFile(null);
+    setImagePreview(product.image_url || null);
     setProductDialogOpen(true);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setProductForm({ ...productForm, image_url: '' });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `products/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
   };
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    setUploading(true);
+
+    let imageUrl = productForm.image_url;
+
+    // Upload new image if selected
+    if (imageFile) {
+      const uploadedUrl = await uploadImage(imageFile);
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        toast.error('Failed to upload image');
+        setUploading(false);
+        return;
+      }
+    }
 
     const productData = {
       name: productForm.name,
       description: productForm.description || null,
       price: parseFloat(productForm.price),
       original_price: productForm.original_price ? parseFloat(productForm.original_price) : null,
-      image_url: productForm.image_url || null,
+      image_url: imageUrl || null,
       category: productForm.category,
       stock: parseInt(productForm.stock) || 0,
       featured: productForm.featured,
@@ -148,6 +213,7 @@ const AdminDashboard = () => {
 
       if (error) {
         toast.error('Failed to update product');
+        setUploading(false);
         return;
       }
       toast.success('Product updated successfully');
@@ -158,11 +224,13 @@ const AdminDashboard = () => {
 
       if (error) {
         toast.error('Failed to add product');
+        setUploading(false);
         return;
       }
       toast.success('Product added successfully');
     }
 
+    setUploading(false);
     setProductDialogOpen(false);
     resetProductForm();
     fetchData();
@@ -344,12 +412,41 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-cream">Image URL</Label>
-                      <Input
-                        value={productForm.image_url}
-                        onChange={(e) => setProductForm({ ...productForm, image_url: e.target.value })}
-                        className="bg-muted border-gold/20 text-cream"
+                      <Label className="text-cream">Product Image</Label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageSelect}
+                        className="hidden"
                       />
+                      {imagePreview ? (
+                        <div className="relative w-full">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-40 object-cover rounded-lg border border-gold/20"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 bg-background/80 hover:bg-background"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full h-40 border-2 border-dashed border-gold/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gold/50 transition-colors"
+                        >
+                          <Upload className="w-8 h-8 text-gold/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">Click to upload image</p>
+                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP</p>
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -388,8 +485,8 @@ const AdminDashboard = () => {
                       />
                       <Label className="text-cream">Featured Product</Label>
                     </div>
-                    <Button type="submit" variant="gold" className="w-full">
-                      {editingProduct ? 'Update Product' : 'Add Product'}
+                    <Button type="submit" variant="gold" className="w-full" disabled={uploading}>
+                      {uploading ? 'Uploading...' : editingProduct ? 'Update Product' : 'Add Product'}
                     </Button>
                   </form>
                 </DialogContent>
