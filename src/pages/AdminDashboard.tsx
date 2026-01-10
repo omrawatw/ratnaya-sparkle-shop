@@ -26,6 +26,13 @@ interface Product {
   created_at: string;
 }
 
+interface ProductImage {
+  id: string;
+  product_id: string;
+  image_url: string;
+  display_order: number;
+}
+
 interface Order {
   id: string;
   customer_name: string;
@@ -69,8 +76,8 @@ const AdminDashboard = () => {
     stock: '',
     featured: false,
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<{ url: string; isNew: boolean; id?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -113,11 +120,11 @@ const AdminDashboard = () => {
       featured: false,
     });
     setEditingProduct(null);
-    setImageFile(null);
-    setImagePreview(null);
+    setImageFiles([]);
+    setImagePreviews([]);
   };
 
-  const handleEditProduct = (product: Product) => {
+  const handleEditProduct = async (product: Product) => {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
@@ -129,29 +136,68 @@ const AdminDashboard = () => {
       stock: product.stock.toString(),
       featured: product.featured,
     });
-    setImageFile(null);
-    setImagePreview(product.image_url || null);
+    setImageFiles([]);
+    
+    // Fetch existing images for this product
+    const { data: existingImages } = await supabase
+      .from('product_images')
+      .select('*')
+      .eq('product_id', product.id)
+      .order('display_order');
+    
+    if (existingImages && existingImages.length > 0) {
+      setImagePreviews(existingImages.map(img => ({ 
+        url: img.image_url, 
+        isNew: false, 
+        id: img.id 
+      })));
+    } else if (product.image_url) {
+      // Fallback to main image_url if no gallery images exist
+      setImagePreviews([{ url: product.image_url, isNew: false }]);
+    } else {
+      setImagePreviews([]);
+    }
+    
     setProductDialogOpen(true);
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const newFiles = [...imageFiles, ...files];
+      setImageFiles(newFiles);
+      
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviews(prev => [...prev, { url: reader.result as string, isNew: true }]);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setProductForm({ ...productForm, image_url: '' });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const removeImage = async (index: number) => {
+    const imageToRemove = imagePreviews[index];
+    
+    // If it's an existing image in the database, delete it
+    if (!imageToRemove.isNew && imageToRemove.id) {
+      await supabase
+        .from('product_images')
+        .delete()
+        .eq('id', imageToRemove.id);
+    }
+    
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    
+    // Also remove from imageFiles if it's a new file
+    if (imageToRemove.isNew) {
+      const newFileIndex = imagePreviews.slice(0, index).filter(p => p.isNew).length;
+      setImageFiles(prev => prev.filter((_, i) => i !== newFileIndex));
     }
   };
 
@@ -180,26 +226,32 @@ const AdminDashboard = () => {
     e.preventDefault();
     setUploading(true);
 
-    let imageUrl = productForm.image_url;
+    let productId = editingProduct?.id;
 
-    // Upload new image if selected
-    if (imageFile) {
-      const uploadedUrl = await uploadImage(imageFile);
+    // Upload new images
+    const uploadedImageUrls: string[] = [];
+    for (const file of imageFiles) {
+      const uploadedUrl = await uploadImage(file);
       if (uploadedUrl) {
-        imageUrl = uploadedUrl;
+        uploadedImageUrls.push(uploadedUrl);
       } else {
-        toast.error('Failed to upload image');
+        toast.error('Failed to upload one or more images');
         setUploading(false);
         return;
       }
     }
+
+    // Get main image URL (first image)
+    const mainImageUrl = imagePreviews.length > 0 
+      ? (imagePreviews[0].isNew ? uploadedImageUrls[0] : imagePreviews[0].url)
+      : null;
 
     const productData = {
       name: productForm.name,
       description: productForm.description || null,
       price: parseFloat(productForm.price),
       original_price: productForm.original_price ? parseFloat(productForm.original_price) : null,
-      image_url: imageUrl || null,
+      image_url: mainImageUrl,
       category: productForm.category,
       stock: parseInt(productForm.stock) || 0,
       featured: productForm.featured,
@@ -216,20 +268,34 @@ const AdminDashboard = () => {
         setUploading(false);
         return;
       }
-      toast.success('Product updated successfully');
     } else {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('products')
-        .insert(productData);
+        .insert(productData)
+        .select()
+        .single();
 
-      if (error) {
+      if (error || !data) {
         toast.error('Failed to add product');
         setUploading(false);
         return;
       }
-      toast.success('Product added successfully');
+      productId = data.id;
     }
 
+    // Save new images to product_images table
+    if (uploadedImageUrls.length > 0 && productId) {
+      const existingCount = imagePreviews.filter(p => !p.isNew).length;
+      const imageRecords = uploadedImageUrls.map((url, index) => ({
+        product_id: productId,
+        image_url: url,
+        display_order: existingCount + index,
+      }));
+
+      await supabase.from('product_images').insert(imageRecords);
+    }
+
+    toast.success(editingProduct ? 'Product updated successfully' : 'Product added successfully');
     setUploading(false);
     setProductDialogOpen(false);
     resetProductForm();
@@ -412,41 +478,52 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-cream">Product Image</Label>
+                      <Label className="text-cream">Product Images</Label>
                       <input
                         ref={fileInputRef}
                         type="file"
                         accept="image/*"
+                        multiple
                         onChange={handleImageSelect}
                         className="hidden"
                       />
-                      {imagePreview ? (
-                        <div className="relative w-full">
-                          <img
-                            src={imagePreview}
-                            alt="Preview"
-                            className="w-full h-40 object-cover rounded-lg border border-gold/20"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={removeImage}
-                            className="absolute top-2 right-2 bg-background/80 hover:bg-background"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ) : (
+                      
+                      {/* Image Grid */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {imagePreviews.map((preview, index) => (
+                          <div key={index} className="relative aspect-square">
+                            <img
+                              src={preview.url}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-full object-cover rounded-lg border border-gold/20"
+                            />
+                            {index === 0 && (
+                              <span className="absolute bottom-1 left-1 text-xs bg-gold text-background px-1 rounded">
+                                Main
+                              </span>
+                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeImage(index)}
+                              className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        
+                        {/* Add More Button */}
                         <div
                           onClick={() => fileInputRef.current?.click()}
-                          className="w-full h-40 border-2 border-dashed border-gold/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gold/50 transition-colors"
+                          className="aspect-square border-2 border-dashed border-gold/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gold/50 transition-colors"
                         >
-                          <Upload className="w-8 h-8 text-gold/50 mb-2" />
-                          <p className="text-sm text-muted-foreground">Click to upload image</p>
-                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP</p>
+                          <Upload className="w-6 h-6 text-gold/50 mb-1" />
+                          <p className="text-xs text-muted-foreground">Add</p>
                         </div>
-                      )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">First image will be the main product image</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
