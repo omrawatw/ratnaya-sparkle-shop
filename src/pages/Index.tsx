@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ProductCard from '@/components/ProductCard';
+import OfferBanner from '@/components/OfferBanner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Product {
@@ -41,6 +42,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <OfferBanner />
       <Header />
       
       {/* Hero Section */}
