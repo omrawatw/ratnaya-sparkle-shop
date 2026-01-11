@@ -4,6 +4,7 @@ import { Search, X, SlidersHorizontal } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ProductCard from '@/components/ProductCard';
+import OfferBanner from '@/components/OfferBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,6 +85,7 @@ const Shop = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <OfferBanner />
       <Header />
       
       {/* Hero with Spotlight */}
