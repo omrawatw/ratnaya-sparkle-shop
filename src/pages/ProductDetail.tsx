@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ShoppingBag, Heart, ArrowLeft, Truck, Shield, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import OfferBanner from '@/components/OfferBanner';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
 import ProductReviews from '@/components/ProductReviews';
@@ -139,6 +140,7 @@ const ProductDetail = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
+        <OfferBanner />
         <Header />
         <div className="pt-32 pb-16 flex justify-center items-center">
           <div className="text-gold">Loading...</div>
@@ -151,6 +153,7 @@ const ProductDetail = () => {
   if (!product) {
     return (
       <div className="min-h-screen bg-background">
+        <OfferBanner />
         <Header />
         <div className="pt-32 pb-16 text-center">
           <h1 className="text-3xl font-display text-cream mb-4">Product Not Found</h1>
@@ -165,6 +168,7 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <OfferBanner />
       <Header />
 
       <section className="pt-32 pb-16">
