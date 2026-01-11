@@ -63,6 +63,7 @@ interface OfferBanner {
   text_color: string;
   link_url: string | null;
   link_text: string | null;
+  image_url: string | null;
   is_active: boolean;
   display_order: number;
 }
@@ -99,9 +100,15 @@ const AdminDashboard = () => {
     text_color: '#1A1A2E',
     link_url: '',
     link_text: '',
+    image_url: '',
     is_active: true,
     display_order: 0,
   });
+
+  const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
+  const [bannerImagePreview, setBannerImagePreview] = useState<string>('');
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
 
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<{ url: string; isNew: boolean; id?: string }[]>([]);
@@ -383,10 +390,55 @@ const AdminDashboard = () => {
       text_color: '#1A1A2E',
       link_url: '',
       link_text: '',
+      image_url: '',
       is_active: true,
       display_order: 0,
     });
     setEditingBanner(null);
+    setBannerImageFile(null);
+    setBannerImagePreview('');
+  };
+
+  const handleBannerImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setBannerImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBannerImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+    if (bannerFileInputRef.current) {
+      bannerFileInputRef.current.value = '';
+    }
+  };
+
+  const removeBannerImage = () => {
+    setBannerImageFile(null);
+    setBannerImagePreview('');
+    setBannerForm({ ...bannerForm, image_url: '' });
+  };
+
+  const uploadBannerImage = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `banners/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
   };
 
   const handleEditBanner = (banner: OfferBanner) => {
@@ -398,14 +450,32 @@ const AdminDashboard = () => {
       text_color: banner.text_color,
       link_url: banner.link_url || '',
       link_text: banner.link_text || '',
+      image_url: banner.image_url || '',
       is_active: banner.is_active,
       display_order: banner.display_order,
     });
+    setBannerImageFile(null);
+    setBannerImagePreview(banner.image_url || '');
     setBannerDialogOpen(true);
   };
 
   const handleSubmitBanner = async (e: React.FormEvent) => {
     e.preventDefault();
+    setBannerUploading(true);
+
+    let imageUrl = bannerForm.image_url;
+
+    // Upload new image if selected
+    if (bannerImageFile) {
+      const uploadedUrl = await uploadBannerImage(bannerImageFile);
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        toast.error('Failed to upload banner image');
+        setBannerUploading(false);
+        return;
+      }
+    }
 
     const bannerData = {
       title: bannerForm.title,
@@ -414,6 +484,7 @@ const AdminDashboard = () => {
       text_color: bannerForm.text_color,
       link_url: bannerForm.link_url || null,
       link_text: bannerForm.link_text || null,
+      image_url: imageUrl || null,
       is_active: bannerForm.is_active,
       display_order: bannerForm.display_order,
     };
@@ -426,6 +497,7 @@ const AdminDashboard = () => {
 
       if (error) {
         toast.error('Failed to update banner');
+        setBannerUploading(false);
         return;
       }
       toast.success('Banner updated successfully');
@@ -436,11 +508,13 @@ const AdminDashboard = () => {
 
       if (error) {
         toast.error('Failed to add banner');
+        setBannerUploading(false);
         return;
       }
       toast.success('Banner added successfully');
     }
 
+    setBannerUploading(false);
     setBannerDialogOpen(false);
     resetBannerForm();
     fetchData();
@@ -993,6 +1067,43 @@ const AdminDashboard = () => {
                         />
                       </div>
                     </div>
+                    {/* Banner Image Upload */}
+                    <div className="space-y-2">
+                      <Label className="text-cream">Banner Image (Optional)</Label>
+                      <input
+                        type="file"
+                        ref={bannerFileInputRef}
+                        onChange={handleBannerImageSelect}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      {bannerImagePreview ? (
+                        <div className="relative">
+                          <img
+                            src={bannerImagePreview}
+                            alt="Banner preview"
+                            className="w-full h-32 object-cover rounded-lg border border-gold/20"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeBannerImage}
+                            className="absolute top-2 right-2 p-1 bg-red-500 rounded-full hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => bannerFileInputRef.current?.click()}
+                          className="w-full h-24 border-2 border-dashed border-gold/30 rounded-lg flex flex-col items-center justify-center gap-2 hover:border-gold/50 transition-colors text-muted-foreground"
+                        >
+                          <Upload className="w-6 h-6" />
+                          <span className="text-sm">Click to upload banner image</span>
+                        </button>
+                      )}
+                    </div>
+
                     <div className="space-y-2">
                       <Label className="text-cream">Display Order</Label>
                       <Input
@@ -1014,22 +1125,31 @@ const AdminDashboard = () => {
                     <div className="space-y-2">
                       <Label className="text-cream">Preview</Label>
                       <div 
-                        className="p-3 rounded-lg text-center"
+                        className="p-3 rounded-lg text-center relative overflow-hidden"
                         style={{ 
                           backgroundColor: bannerForm.background_color,
                           color: bannerForm.text_color 
                         }}
                       >
-                        <span className="font-bold mr-2">{bannerForm.title || 'Banner Title'}</span>
-                        <span className="text-sm opacity-90">{bannerForm.description}</span>
-                        {bannerForm.link_text && (
-                          <span className="ml-2 underline text-sm">{bannerForm.link_text}</span>
+                        {bannerImagePreview && (
+                          <img
+                            src={bannerImagePreview}
+                            alt=""
+                            className="absolute inset-0 w-full h-full object-cover opacity-30"
+                          />
                         )}
+                        <div className="relative z-10">
+                          <span className="font-bold mr-2">{bannerForm.title || 'Banner Title'}</span>
+                          <span className="text-sm opacity-90">{bannerForm.description}</span>
+                          {bannerForm.link_text && (
+                            <span className="ml-2 underline text-sm">{bannerForm.link_text}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     
-                    <Button type="submit" variant="gold" className="w-full">
-                      {editingBanner ? 'Update Banner' : 'Add Banner'}
+                    <Button type="submit" variant="gold" className="w-full" disabled={bannerUploading}>
+                      {bannerUploading ? 'Uploading...' : (editingBanner ? 'Update Banner' : 'Add Banner')}
                     </Button>
                   </form>
                 </DialogContent>

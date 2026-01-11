@@ -11,6 +11,7 @@ interface Banner {
   text_color: string;
   link_url: string | null;
   link_text: string | null;
+  image_url: string | null;
 }
 
 const OfferBanner = () => {
@@ -58,12 +59,19 @@ const OfferBanner = () => {
 
   return (
     <div 
-      className="relative py-3 px-4"
+      className="relative py-3 px-4 overflow-hidden"
       style={{ 
         backgroundColor: currentBanner.background_color,
         color: currentBanner.text_color 
       }}
     >
+      {currentBanner.image_url && (
+        <img
+          src={currentBanner.image_url}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-30"
+        />
+      )}
       <div className="container mx-auto flex items-center justify-center gap-4">
         {banners.length > 1 && (
           <button 
