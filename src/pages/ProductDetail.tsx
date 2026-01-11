@@ -257,11 +257,11 @@ const ProductDetail = () => {
               </h1>
 
               <div className="flex items-baseline gap-4 mb-6">
-                <span className="text-4xl font-display text-gold font-bold">
+                <span className="text-4xl font-sans text-gold font-bold">
                   {formatPrice(product.price)}
                 </span>
                 {product.original_price && (
-                  <span className="text-xl text-muted-foreground line-through font-body">
+                  <span className="text-xl text-muted-foreground line-through font-sans">
                     {formatPrice(product.original_price)}
                   </span>
                 )}

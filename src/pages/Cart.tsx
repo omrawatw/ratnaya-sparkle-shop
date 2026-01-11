@@ -57,7 +57,7 @@ const Cart = () => {
                     />
                     <div className="flex-1">
                       <h3 className="font-display text-xl text-cream mb-2">{item.name}</h3>
-                      <p className="text-gold font-display text-lg mb-4">
+                      <p className="text-gold font-sans text-lg mb-4">
                         {formatPrice(item.price)}
                       </p>
                       <div className="flex items-center gap-4">
@@ -99,11 +99,11 @@ const Cart = () => {
                   <h2 className="text-2xl font-display text-cream mb-6">Order Summary</h2>
                   
                   <div className="space-y-4 mb-6 pb-6 border-b border-gold/10">
-                    <div className="flex justify-between font-body">
+                    <div className="flex justify-between font-sans">
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="text-cream">{formatPrice(totalAmount)}</span>
                     </div>
-                    <div className="flex justify-between font-body">
+                    <div className="flex justify-between font-sans">
                       <span className="text-muted-foreground">Shipping</span>
                       <span className="text-gold">Free</span>
                     </div>
@@ -111,7 +111,7 @@ const Cart = () => {
 
                   <div className="flex justify-between mb-8">
                     <span className="text-xl font-display text-cream">Total</span>
-                    <span className="text-2xl font-display text-gold font-bold">
+                    <span className="text-2xl font-sans text-gold font-bold">
                       {formatPrice(totalAmount)}
                     </span>
                   </div>

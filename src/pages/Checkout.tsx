@@ -305,17 +305,17 @@ const Checkout = () => {
                           <p className="text-cream font-body text-sm">{item.name}</p>
                           <p className="text-muted-foreground text-xs">Qty: {item.quantity}</p>
                         </div>
-                        <p className="text-gold font-body">{formatPrice(item.price * item.quantity)}</p>
+                        <p className="text-gold font-sans">{formatPrice(item.price * item.quantity)}</p>
                       </div>
                     ))}
                   </div>
 
                   <div className="space-y-4 mb-6 pt-6 border-t border-gold/10">
-                    <div className="flex justify-between font-body">
+                    <div className="flex justify-between font-sans">
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="text-cream">{formatPrice(totalAmount)}</span>
                     </div>
-                    <div className="flex justify-between font-body">
+                    <div className="flex justify-between font-sans">
                       <span className="text-muted-foreground">Shipping</span>
                       <span className="text-gold">Free</span>
                     </div>
@@ -323,7 +323,7 @@ const Checkout = () => {
 
                   <div className="flex justify-between mb-8 pt-4 border-t border-gold/10">
                     <span className="text-xl font-display text-cream">Total</span>
-                    <span className="text-2xl font-display text-gold font-bold">
+                    <span className="text-2xl font-sans text-gold font-bold">
                       {formatPrice(totalAmount)}
                     </span>
                   </div>

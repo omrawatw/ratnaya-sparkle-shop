@@ -111,7 +111,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="text-cream font-display text-lg mb-1">Visit Our Store</h3>
-                    <p className="text-muted-foreground font-body">
+                    <p className="text-muted-foreground font-sans">
                       123 Jewelry Lane, Bandra West<br />Mumbai, Maharashtra 400050
                     </p>
                   </div>
@@ -123,7 +123,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="text-cream font-display text-lg mb-1">Call Us</h3>
-                    <p className="text-muted-foreground font-body">
+                    <p className="text-muted-foreground font-sans">
                       +91 98765 43210<br />+91 22 2634 5678
                     </p>
                   </div>
@@ -135,7 +135,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="text-cream font-display text-lg mb-1">Email Us</h3>
-                    <p className="text-muted-foreground font-body">
+                    <p className="text-muted-foreground font-sans">
                       hello@ratnaya.com<br />support@ratnaya.com
                     </p>
                   </div>
@@ -147,7 +147,7 @@ const Contact = () => {
                   </div>
                   <div>
                     <h3 className="text-cream font-display text-lg mb-1">Store Hours</h3>
-                    <p className="text-muted-foreground font-body">
+                    <p className="text-muted-foreground font-sans">
                       Mon - Sat: 10:00 AM - 8:00 PM<br />Sunday: 11:00 AM - 6:00 PM
                     </p>
                   </div>

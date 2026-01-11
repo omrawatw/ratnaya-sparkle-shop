@@ -101,11 +101,11 @@ const ProductCard = ({ id, name, price, original_price, image_url, category }: P
             {name}
           </h3>
           <div className="flex items-center gap-3">
-            <span className="text-gold font-display text-xl font-semibold">
+            <span className="text-gold font-sans text-xl font-semibold">
               {formatPrice(price)}
             </span>
             {original_price && (
-              <span className="text-muted-foreground line-through text-sm font-body">
+              <span className="text-muted-foreground line-through text-sm font-sans">
                 {formatPrice(original_price)}
               </span>
             )}
