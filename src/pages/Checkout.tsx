@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CreditCard, Banknote, Smartphone, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { CreditCard, Banknote, Smartphone, CheckCircle, Truck } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import OfferBanner from '@/components/OfferBanner';
@@ -12,12 +12,25 @@ import { useCart } from '@/contexts/CartContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+interface DeliverySetting {
+  id: string;
+  name: string;
+  charge: number;
+  min_order_amount: number | null;
+  is_free: boolean;
+  is_active: boolean;
+}
+
 const Checkout = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { items, totalAmount, clearCart } = useCart();
   const [loading, setLoading] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderId, setOrderId] = useState('');
+  const [deliveryOptions, setDeliveryOptions] = useState<DeliverySetting[]>([]);
+  const [selectedDelivery, setSelectedDelivery] = useState<string>('');
+  const [deliveryCharge, setDeliveryCharge] = useState(0);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -29,6 +42,49 @@ const Checkout = () => {
     pincode: '',
     paymentMethod: 'cod',
   });
+
+  useEffect(() => {
+    fetchDeliveryOptions();
+  }, []);
+
+  useEffect(() => {
+    calculateDeliveryCharge();
+  }, [totalAmount, selectedDelivery, deliveryOptions]);
+
+  const fetchDeliveryOptions = async () => {
+    const { data } = await supabase
+      .from('delivery_settings')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order');
+    
+    if (data && data.length > 0) {
+      setDeliveryOptions(data);
+      // Use delivery from URL params or default to first option
+      const deliveryFromUrl = searchParams.get('delivery');
+      const validDelivery = data.find(d => d.id === deliveryFromUrl);
+      setSelectedDelivery(validDelivery?.id || data[0].id);
+    }
+  };
+
+  const calculateDeliveryCharge = () => {
+    const selected = deliveryOptions.find(d => d.id === selectedDelivery);
+    if (!selected) {
+      setDeliveryCharge(0);
+      return;
+    }
+
+    if (selected.is_free && selected.min_order_amount !== null) {
+      if (totalAmount >= selected.min_order_amount) {
+        setDeliveryCharge(0);
+      } else {
+        const standardDelivery = deliveryOptions.find(d => !d.is_free && d.is_active);
+        setDeliveryCharge(standardDelivery?.charge || 0);
+      }
+    } else {
+      setDeliveryCharge(selected.charge);
+    }
+  };
 
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -42,6 +98,19 @@ const Checkout = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const getDeliveryLabel = (delivery: DeliverySetting) => {
+    if (delivery.is_free && delivery.min_order_amount !== null) {
+      const qualifies = totalAmount >= delivery.min_order_amount;
+      if (qualifies) {
+        return `${delivery.name} - FREE`;
+      }
+      return `${delivery.name} - ${formatPrice(delivery.min_order_amount - totalAmount)} more for free delivery`;
+    }
+    return `${delivery.name} - ${formatPrice(delivery.charge)}`;
+  };
+
+  const grandTotal = totalAmount + deliveryCharge;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -53,7 +122,7 @@ const Checkout = () => {
     setLoading(true);
 
     try {
-      // Create order
+      // Create order with delivery charge included
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -65,7 +134,7 @@ const Checkout = () => {
           state: formData.state,
           pincode: formData.pincode,
           payment_method: formData.paymentMethod,
-          total_amount: totalAmount,
+          total_amount: grandTotal,
           status: 'pending',
         })
         .select()
@@ -246,6 +315,49 @@ const Checkout = () => {
                   </div>
                 </div>
 
+                {/* Delivery Option */}
+                {deliveryOptions.length > 0 && (
+                  <div className="bg-card border border-gold/10 rounded-lg p-8">
+                    <h2 className="text-2xl font-display text-cream mb-6 flex items-center gap-3">
+                      <Truck className="w-6 h-6 text-gold" />
+                      Delivery Option
+                    </h2>
+                    <RadioGroup
+                      value={selectedDelivery}
+                      onValueChange={setSelectedDelivery}
+                      className="space-y-4"
+                    >
+                      {deliveryOptions.map((delivery) => (
+                        <div key={delivery.id} className="flex items-center space-x-4 bg-muted p-4 rounded-lg border border-gold/10 cursor-pointer hover:border-gold/30 transition-colors">
+                          <RadioGroupItem value={delivery.id} id={`delivery-${delivery.id}`} />
+                          <Label htmlFor={`delivery-${delivery.id}`} className="flex items-center gap-3 cursor-pointer flex-1">
+                            <Truck className="w-6 h-6 text-gold" />
+                            <div>
+                              <p className="text-cream font-body font-semibold">{delivery.name}</p>
+                              <p className="text-muted-foreground text-sm">
+                                {delivery.is_free && delivery.min_order_amount !== null
+                                  ? totalAmount >= delivery.min_order_amount
+                                    ? 'Free delivery - You qualify!'
+                                    : `Free on orders above ${formatPrice(delivery.min_order_amount)}`
+                                  : `Delivery charge: ${formatPrice(delivery.charge)}`
+                                }
+                              </p>
+                            </div>
+                          </Label>
+                          <span className={`font-sans font-semibold ${deliveryCharge === 0 && delivery.id === selectedDelivery ? 'text-gold' : 'text-cream'}`}>
+                            {delivery.is_free && delivery.min_order_amount !== null && totalAmount >= delivery.min_order_amount
+                              ? 'FREE'
+                              : delivery.is_free
+                                ? formatPrice(deliveryOptions.find(d => !d.is_free)?.charge || 0)
+                                : formatPrice(delivery.charge)
+                            }
+                          </span>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                )}
+
                 {/* Payment Method */}
                 <div className="bg-card border border-gold/10 rounded-lg p-8">
                   <h2 className="text-2xl font-display text-cream mb-6">Payment Method</h2>
@@ -317,14 +429,16 @@ const Checkout = () => {
                     </div>
                     <div className="flex justify-between font-sans">
                       <span className="text-muted-foreground">Shipping</span>
-                      <span className="text-gold">Free</span>
+                      <span className={deliveryCharge === 0 ? 'text-gold' : 'text-cream'}>
+                        {deliveryCharge === 0 ? 'Free' : formatPrice(deliveryCharge)}
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex justify-between mb-8 pt-4 border-t border-gold/10">
                     <span className="text-xl font-display text-cream">Total</span>
                     <span className="text-2xl font-sans text-gold font-bold">
-                      {formatPrice(totalAmount)}
+                      {formatPrice(grandTotal)}
                     </span>
                   </div>
 
