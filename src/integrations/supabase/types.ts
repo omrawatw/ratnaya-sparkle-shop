@@ -35,6 +35,42 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_settings: {
+        Row: {
+          charge: number
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          is_free: boolean
+          min_order_amount: number | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          charge?: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_free?: boolean
+          min_order_amount?: number | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          charge?: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          is_free?: boolean
+          min_order_amount?: number | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       offer_banners: {
         Row: {
           background_color: string | null

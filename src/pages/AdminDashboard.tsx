@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X, Megaphone } from 'lucide-react';
+import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X, Megaphone, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -68,17 +68,30 @@ interface OfferBanner {
   display_order: number;
 }
 
+interface DeliverySetting {
+  id: string;
+  name: string;
+  charge: number;
+  min_order_amount: number | null;
+  is_free: boolean;
+  is_active: boolean;
+  display_order: number;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAdmin();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<OfferBanner[]>([]);
+  const [deliverySettings, setDeliverySettings] = useState<DeliverySetting[]>([]);
   const [loading, setLoading] = useState(true);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingBanner, setEditingBanner] = useState<OfferBanner | null>(null);
+  const [editingDelivery, setEditingDelivery] = useState<DeliverySetting | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
@@ -105,6 +118,15 @@ const AdminDashboard = () => {
     display_order: 0,
   });
 
+  const [deliveryForm, setDeliveryForm] = useState({
+    name: '',
+    charge: '',
+    min_order_amount: '',
+    is_free: false,
+    is_active: true,
+    display_order: 0,
+  });
+
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [bannerImagePreview, setBannerImagePreview] = useState<string>('');
   const [bannerUploading, setBannerUploading] = useState(false);
@@ -126,15 +148,17 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     
-    const [productsRes, ordersRes, bannersRes] = await Promise.all([
+    const [productsRes, ordersRes, bannersRes, deliveryRes] = await Promise.all([
       supabase.from('products').select('*').order('created_at', { ascending: false }),
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
       supabase.from('offer_banners').select('*').order('display_order'),
+      supabase.from('delivery_settings').select('*').order('display_order'),
     ]);
 
     if (productsRes.data) setProducts(productsRes.data);
     if (ordersRes.data) setOrders(ordersRes.data);
     if (bannersRes.data) setBanners(bannersRes.data);
+    if (deliveryRes.data) setDeliverySettings(deliveryRes.data);
     
     setLoading(false);
   };
@@ -547,6 +571,99 @@ const AdminDashboard = () => {
     fetchData();
   };
 
+  // Delivery Settings handlers
+  const resetDeliveryForm = () => {
+    setDeliveryForm({
+      name: '',
+      charge: '',
+      min_order_amount: '',
+      is_free: false,
+      is_active: true,
+      display_order: 0,
+    });
+    setEditingDelivery(null);
+  };
+
+  const handleEditDelivery = (delivery: DeliverySetting) => {
+    setEditingDelivery(delivery);
+    setDeliveryForm({
+      name: delivery.name,
+      charge: delivery.charge.toString(),
+      min_order_amount: delivery.min_order_amount?.toString() || '',
+      is_free: delivery.is_free,
+      is_active: delivery.is_active,
+      display_order: delivery.display_order,
+    });
+    setDeliveryDialogOpen(true);
+  };
+
+  const handleSubmitDelivery = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const deliveryData = {
+      name: deliveryForm.name,
+      charge: deliveryForm.is_free ? 0 : parseFloat(deliveryForm.charge) || 0,
+      min_order_amount: deliveryForm.min_order_amount ? parseFloat(deliveryForm.min_order_amount) : null,
+      is_free: deliveryForm.is_free,
+      is_active: deliveryForm.is_active,
+      display_order: deliveryForm.display_order,
+    };
+
+    if (editingDelivery) {
+      const { error } = await supabase
+        .from('delivery_settings')
+        .update(deliveryData)
+        .eq('id', editingDelivery.id);
+
+      if (error) {
+        toast.error('Failed to update delivery option');
+        return;
+      }
+      toast.success('Delivery option updated successfully');
+    } else {
+      const { error } = await supabase
+        .from('delivery_settings')
+        .insert(deliveryData);
+
+      if (error) {
+        toast.error('Failed to add delivery option');
+        return;
+      }
+      toast.success('Delivery option added successfully');
+    }
+
+    setDeliveryDialogOpen(false);
+    resetDeliveryForm();
+    fetchData();
+  };
+
+  const handleDeleteDelivery = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this delivery option?')) return;
+
+    const { error } = await supabase.from('delivery_settings').delete().eq('id', id);
+
+    if (error) {
+      toast.error('Failed to delete delivery option');
+      return;
+    }
+
+    toast.success('Delivery option deleted successfully');
+    fetchData();
+  };
+
+  const toggleDeliveryActive = async (id: string, isActive: boolean) => {
+    const { error } = await supabase
+      .from('delivery_settings')
+      .update({ is_active: isActive })
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Failed to update delivery option');
+      return;
+    }
+    fetchData();
+  };
+
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -621,6 +738,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="banners" className="data-[state=active]:bg-gold data-[state=active]:text-background">
               <Megaphone className="w-4 h-4 mr-1" />
               Banners
+            </TabsTrigger>
+            <TabsTrigger value="delivery" className="data-[state=active]:bg-gold data-[state=active]:text-background">
+              <Truck className="w-4 h-4 mr-1" />
+              Delivery
             </TabsTrigger>
           </TabsList>
 
@@ -1208,6 +1329,153 @@ const AdminDashboard = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteBanner(banner.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Delivery Settings Tab */}
+          <TabsContent value="delivery">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-display text-cream">Delivery Settings</h2>
+              <Dialog open={deliveryDialogOpen} onOpenChange={(open) => {
+                setDeliveryDialogOpen(open);
+                if (!open) resetDeliveryForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button variant="gold">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Delivery Option
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-gold/20 max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle className="text-cream font-display">
+                      {editingDelivery ? 'Edit Delivery Option' : 'Add Delivery Option'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmitDelivery} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-cream">Name *</Label>
+                      <Input
+                        value={deliveryForm.name}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, name: e.target.value })}
+                        required
+                        placeholder="e.g., Standard Delivery"
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 py-2">
+                      <Switch
+                        checked={deliveryForm.is_free}
+                        onCheckedChange={(checked) => setDeliveryForm({ ...deliveryForm, is_free: checked, charge: checked ? '0' : deliveryForm.charge })}
+                      />
+                      <Label className="text-cream">Free Delivery (based on minimum order)</Label>
+                    </div>
+                    {!deliveryForm.is_free && (
+                      <div className="space-y-2">
+                        <Label className="text-cream">Delivery Charge (₹)</Label>
+                        <Input
+                          type="number"
+                          value={deliveryForm.charge}
+                          onChange={(e) => setDeliveryForm({ ...deliveryForm, charge: e.target.value })}
+                          placeholder="99"
+                          className="bg-muted border-gold/20 text-cream"
+                        />
+                      </div>
+                    )}
+                    {deliveryForm.is_free && (
+                      <div className="space-y-2">
+                        <Label className="text-cream">Minimum Order Amount (₹) for Free Delivery</Label>
+                        <Input
+                          type="number"
+                          value={deliveryForm.min_order_amount}
+                          onChange={(e) => setDeliveryForm({ ...deliveryForm, min_order_amount: e.target.value })}
+                          placeholder="2000"
+                          className="bg-muted border-gold/20 text-cream"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Orders above this amount qualify for free delivery
+                        </p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label className="text-cream">Display Order</Label>
+                      <Input
+                        type="number"
+                        value={deliveryForm.display_order}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, display_order: parseInt(e.target.value) || 0 })}
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={deliveryForm.is_active}
+                        onCheckedChange={(checked) => setDeliveryForm({ ...deliveryForm, is_active: checked })}
+                      />
+                      <Label className="text-cream">Active</Label>
+                    </div>
+                    <Button type="submit" variant="gold" className="w-full">
+                      {editingDelivery ? 'Update Delivery Option' : 'Add Delivery Option'}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading...</div>
+            ) : deliverySettings.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Truck className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No delivery options yet. Add your first delivery option!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {deliverySettings.map((delivery) => (
+                  <div 
+                    key={delivery.id} 
+                    className="bg-card border border-gold/10 rounded-lg p-4 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-16 h-10 rounded bg-gold/10 flex items-center justify-center">
+                        <Truck className="w-5 h-5 text-gold" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-cream font-display">{delivery.name}</p>
+                        <p className="text-muted-foreground text-sm">
+                          {delivery.is_free 
+                            ? `Free on orders above ${formatPrice(delivery.min_order_amount || 0)}` 
+                            : formatPrice(delivery.charge)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={delivery.is_active}
+                          onCheckedChange={(checked) => toggleDeliveryActive(delivery.id, checked)}
+                        />
+                        <span className={`text-xs ${delivery.is_active ? 'text-green-400' : 'text-muted-foreground'}`}>
+                          {delivery.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditDelivery(delivery)}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteDelivery(delivery.id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
