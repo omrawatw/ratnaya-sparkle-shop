@@ -17,6 +17,7 @@ interface DeliverySetting {
   min_order_amount: number | null;
   is_free: boolean;
   is_active: boolean;
+  estimated_time: string | null;
 }
 
 const Cart = () => {
@@ -186,7 +187,10 @@ const Cart = () => {
                           <div key={delivery.id} className="flex items-center space-x-3">
                             <RadioGroupItem value={delivery.id} id={delivery.id} />
                             <Label htmlFor={delivery.id} className="text-sm text-muted-foreground cursor-pointer flex-1">
-                              {getDeliveryLabel(delivery)}
+                              <span>{getDeliveryLabel(delivery)}</span>
+                              {delivery.estimated_time && (
+                                <span className="block text-xs text-gold/70 mt-0.5">{delivery.estimated_time}</span>
+                              )}
                             </Label>
                           </div>
                         ))}
