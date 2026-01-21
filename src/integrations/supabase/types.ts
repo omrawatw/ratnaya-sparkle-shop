@@ -40,6 +40,7 @@ export type Database = {
           charge: number
           created_at: string
           display_order: number
+          estimated_time: string | null
           id: string
           is_active: boolean
           is_free: boolean
@@ -51,6 +52,7 @@ export type Database = {
           charge?: number
           created_at?: string
           display_order?: number
+          estimated_time?: string | null
           id?: string
           is_active?: boolean
           is_free?: boolean
@@ -62,6 +64,7 @@ export type Database = {
           charge?: number
           created_at?: string
           display_order?: number
+          estimated_time?: string | null
           id?: string
           is_active?: boolean
           is_free?: boolean

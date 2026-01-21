@@ -76,6 +76,7 @@ interface DeliverySetting {
   is_free: boolean;
   is_active: boolean;
   display_order: number;
+  estimated_time: string | null;
 }
 
 const AdminDashboard = () => {
@@ -125,6 +126,7 @@ const AdminDashboard = () => {
     is_free: false,
     is_active: true,
     display_order: 0,
+    estimated_time: '',
   });
 
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
@@ -580,6 +582,7 @@ const AdminDashboard = () => {
       is_free: false,
       is_active: true,
       display_order: 0,
+      estimated_time: '',
     });
     setEditingDelivery(null);
   };
@@ -593,6 +596,7 @@ const AdminDashboard = () => {
       is_free: delivery.is_free,
       is_active: delivery.is_active,
       display_order: delivery.display_order,
+      estimated_time: delivery.estimated_time || '',
     });
     setDeliveryDialogOpen(true);
   };
@@ -607,6 +611,7 @@ const AdminDashboard = () => {
       is_free: deliveryForm.is_free,
       is_active: deliveryForm.is_active,
       display_order: deliveryForm.display_order,
+      estimated_time: deliveryForm.estimated_time || null,
     };
 
     if (editingDelivery) {
@@ -1405,6 +1410,18 @@ const AdminDashboard = () => {
                       </div>
                     )}
                     <div className="space-y-2">
+                      <Label className="text-cream">Estimated Delivery Time</Label>
+                      <Input
+                        value={deliveryForm.estimated_time}
+                        onChange={(e) => setDeliveryForm({ ...deliveryForm, estimated_time: e.target.value })}
+                        placeholder="e.g., 3-5 business days"
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Time estimate shown to customers
+                      </p>
+                    </div>
+                    <div className="space-y-2">
                       <Label className="text-cream">Display Order</Label>
                       <Input
                         type="number"
@@ -1452,6 +1469,7 @@ const AdminDashboard = () => {
                           {delivery.is_free 
                             ? `Free on orders above ${formatPrice(delivery.min_order_amount || 0)}` 
                             : formatPrice(delivery.charge)}
+                          {delivery.estimated_time && ` • ${delivery.estimated_time}`}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

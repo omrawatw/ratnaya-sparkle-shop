@@ -19,6 +19,7 @@ interface DeliverySetting {
   min_order_amount: number | null;
   is_free: boolean;
   is_active: boolean;
+  estimated_time: string | null;
 }
 
 const Checkout = () => {
@@ -342,6 +343,9 @@ const Checkout = () => {
                                   : `Delivery charge: ${formatPrice(delivery.charge)}`
                                 }
                               </p>
+                              {delivery.estimated_time && (
+                                <p className="text-gold text-xs mt-1">📦 {delivery.estimated_time}</p>
+                              )}
                             </div>
                           </Label>
                           <span className={`font-sans font-semibold ${deliveryCharge === 0 && delivery.id === selectedDelivery ? 'text-gold' : 'text-cream'}`}>
