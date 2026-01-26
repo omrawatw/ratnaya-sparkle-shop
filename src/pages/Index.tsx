@@ -6,6 +6,7 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ProductCard from '@/components/ProductCard';
 import OfferBanner from '@/components/OfferBanner';
+import FestivalBanner from '@/components/FestivalBanner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Product {
@@ -45,8 +46,13 @@ const Index = () => {
       <OfferBanner />
       <Header />
       
+      {/* Festival Banner */}
+      <div className="pt-20">
+        <FestivalBanner />
+      </div>
+      
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-background via-card to-background" />
         <div className="absolute inset-0 opacity-20">
