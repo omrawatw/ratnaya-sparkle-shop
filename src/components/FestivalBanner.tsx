@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,8 @@ interface FestivalBannerData {
 const FestivalBanner = () => {
   const [banners, setBanners] = useState<FestivalBannerData[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const sliderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchBanners = async () => {
@@ -34,55 +36,77 @@ const FestivalBanner = () => {
     if (banners.length <= 1) return;
     
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % banners.length);
+      nextBanner();
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [banners.length]);
+  }, [banners.length, currentIndex]);
 
   if (banners.length === 0) return null;
 
-  const currentBanner = banners[currentIndex];
-
   const nextBanner = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     setCurrentIndex((prev) => (prev + 1) % banners.length);
+    setTimeout(() => setIsTransitioning(false), 500);
   };
 
   const prevBanner = () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
+    setTimeout(() => setIsTransitioning(false), 500);
   };
 
-  const bannerContent = (
-    <img
-      src={currentBanner.image_url}
-      alt={currentBanner.alt_text}
-      className="w-full h-auto object-cover rounded-lg"
-    />
-  );
+  const goToBanner = (index: number) => {
+    if (isTransitioning || index === currentIndex) return;
+    setIsTransitioning(true);
+    setCurrentIndex(index);
+    setTimeout(() => setIsTransitioning(false), 500);
+  };
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="relative overflow-hidden rounded-lg">
-        {currentBanner.link_url ? (
-          <Link to={currentBanner.link_url} className="block">
-            {bannerContent}
-          </Link>
-        ) : (
-          bannerContent
-        )}
+    <div className="container mx-auto px-4 py-4">
+      <div className="relative overflow-hidden rounded-lg" style={{ height: '280px' }}>
+        {/* Sliding container */}
+        <div 
+          ref={sliderRef}
+          className="flex h-full transition-transform duration-500 ease-in-out"
+          style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+        >
+          {banners.map((banner) => (
+            <div key={banner.id} className="w-full h-full flex-shrink-0">
+              {banner.link_url ? (
+                <Link to={banner.link_url} className="block w-full h-full">
+                  <img
+                    src={banner.image_url}
+                    alt={banner.alt_text}
+                    className="w-full h-full object-cover"
+                  />
+                </Link>
+              ) : (
+                <img
+                  src={banner.image_url}
+                  alt={banner.alt_text}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
+          ))}
+        </div>
 
         {/* Navigation arrows */}
         {banners.length > 1 && (
           <>
             <button 
-              onClick={(e) => { e.preventDefault(); prevBanner(); }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-background/80 hover:bg-background rounded-full transition-colors"
+              onClick={prevBanner}
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-background/80 hover:bg-background rounded-full transition-colors z-10"
             >
               <ChevronLeft className="w-5 h-5 text-foreground" />
             </button>
             <button 
-              onClick={(e) => { e.preventDefault(); nextBanner(); }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-background/80 hover:bg-background rounded-full transition-colors"
+              onClick={nextBanner}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-background/80 hover:bg-background rounded-full transition-colors z-10"
             >
               <ChevronRight className="w-5 h-5 text-foreground" />
             </button>
@@ -91,15 +115,15 @@ const FestivalBanner = () => {
 
         {/* Dots indicator */}
         {banners.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
             {banners.map((_, index) => (
               <button
                 key={index}
-                onClick={(e) => { e.preventDefault(); setCurrentIndex(index); }}
-                className={`w-2 h-2 rounded-full transition-all ${
+                onClick={() => goToBanner(index)}
+                className={`h-2 rounded-full transition-all duration-300 ${
                   index === currentIndex 
                     ? 'bg-gold w-6' 
-                    : 'bg-background/60 hover:bg-background/80'
+                    : 'bg-background/60 hover:bg-background/80 w-2'
                 }`}
               />
             ))}
