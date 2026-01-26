@@ -67,7 +67,7 @@ const FestivalBanner = () => {
 
   return (
     <div className="container mx-auto px-4 py-4">
-      <div className="relative overflow-hidden rounded-lg" style={{ height: '280px' }}>
+      <div className="relative overflow-hidden rounded-lg h-[180px] sm:h-[220px] md:h-[280px] lg:h-[320px]">
         {/* Sliding container */}
         <div 
           ref={sliderRef}
