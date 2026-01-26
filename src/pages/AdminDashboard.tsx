@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X, Megaphone, Truck } from 'lucide-react';
+import { Package, ShoppingCart, Plus, LogOut, Pencil, Trash2, Eye, Upload, X, Megaphone, Truck, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,6 +79,15 @@ interface DeliverySetting {
   estimated_time: string | null;
 }
 
+interface FestivalBanner {
+  id: string;
+  image_url: string;
+  link_url: string | null;
+  alt_text: string;
+  is_active: boolean;
+  display_order: number;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAdmin();
@@ -86,13 +95,16 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [banners, setBanners] = useState<OfferBanner[]>([]);
   const [deliverySettings, setDeliverySettings] = useState<DeliverySetting[]>([]);
+  const [festivalBanners, setFestivalBanners] = useState<FestivalBanner[]>([]);
   const [loading, setLoading] = useState(true);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [bannerDialogOpen, setBannerDialogOpen] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+  const [festivalDialogOpen, setFestivalDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingBanner, setEditingBanner] = useState<OfferBanner | null>(null);
   const [editingDelivery, setEditingDelivery] = useState<DeliverySetting | null>(null);
+  const [editingFestival, setEditingFestival] = useState<FestivalBanner | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
@@ -129,6 +141,19 @@ const AdminDashboard = () => {
     estimated_time: '',
   });
 
+  const [festivalForm, setFestivalForm] = useState({
+    image_url: '',
+    link_url: '',
+    alt_text: 'Festival Banner',
+    is_active: true,
+    display_order: 0,
+  });
+
+  const [festivalImageFile, setFestivalImageFile] = useState<File | null>(null);
+  const [festivalImagePreview, setFestivalImagePreview] = useState<string>('');
+  const [festivalUploading, setFestivalUploading] = useState(false);
+  const festivalFileInputRef = useRef<HTMLInputElement>(null);
+
   const [bannerImageFile, setBannerImageFile] = useState<File | null>(null);
   const [bannerImagePreview, setBannerImagePreview] = useState<string>('');
   const [bannerUploading, setBannerUploading] = useState(false);
@@ -150,17 +175,19 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     setLoading(true);
     
-    const [productsRes, ordersRes, bannersRes, deliveryRes] = await Promise.all([
+    const [productsRes, ordersRes, bannersRes, deliveryRes, festivalRes] = await Promise.all([
       supabase.from('products').select('*').order('created_at', { ascending: false }),
       supabase.from('orders').select('*').order('created_at', { ascending: false }),
       supabase.from('offer_banners').select('*').order('display_order'),
       supabase.from('delivery_settings').select('*').order('display_order'),
+      supabase.from('festival_banners').select('*').order('display_order'),
     ]);
 
     if (productsRes.data) setProducts(productsRes.data);
     if (ordersRes.data) setOrders(ordersRes.data);
     if (bannersRes.data) setBanners(bannersRes.data);
     if (deliveryRes.data) setDeliverySettings(deliveryRes.data);
+    if (festivalRes.data) setFestivalBanners(festivalRes.data);
     
     setLoading(false);
   };
@@ -669,6 +696,166 @@ const AdminDashboard = () => {
     fetchData();
   };
 
+  // Festival Banner handlers
+  const resetFestivalForm = () => {
+    setFestivalForm({
+      image_url: '',
+      link_url: '',
+      alt_text: 'Festival Banner',
+      is_active: true,
+      display_order: 0,
+    });
+    setEditingFestival(null);
+    setFestivalImageFile(null);
+    setFestivalImagePreview('');
+  };
+
+  const handleFestivalImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFestivalImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFestivalImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+    if (festivalFileInputRef.current) {
+      festivalFileInputRef.current.value = '';
+    }
+  };
+
+  const removeFestivalImage = () => {
+    setFestivalImageFile(null);
+    setFestivalImagePreview('');
+    setFestivalForm({ ...festivalForm, image_url: '' });
+  };
+
+  const uploadFestivalImage = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `festival-banners/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('product-images')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+
+    const { data } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  };
+
+  const handleEditFestival = (banner: FestivalBanner) => {
+    setEditingFestival(banner);
+    setFestivalForm({
+      image_url: banner.image_url,
+      link_url: banner.link_url || '',
+      alt_text: banner.alt_text,
+      is_active: banner.is_active,
+      display_order: banner.display_order,
+    });
+    setFestivalImageFile(null);
+    setFestivalImagePreview(banner.image_url);
+    setFestivalDialogOpen(true);
+  };
+
+  const handleSubmitFestival = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFestivalUploading(true);
+
+    let imageUrl = festivalForm.image_url;
+
+    // Upload new image if selected
+    if (festivalImageFile) {
+      const uploadedUrl = await uploadFestivalImage(festivalImageFile);
+      if (uploadedUrl) {
+        imageUrl = uploadedUrl;
+      } else {
+        toast.error('Failed to upload festival banner image');
+        setFestivalUploading(false);
+        return;
+      }
+    }
+
+    if (!imageUrl) {
+      toast.error('Please upload an image');
+      setFestivalUploading(false);
+      return;
+    }
+
+    const festivalData = {
+      image_url: imageUrl,
+      link_url: festivalForm.link_url || null,
+      alt_text: festivalForm.alt_text,
+      is_active: festivalForm.is_active,
+      display_order: festivalForm.display_order,
+    };
+
+    if (editingFestival) {
+      const { error } = await supabase
+        .from('festival_banners')
+        .update(festivalData)
+        .eq('id', editingFestival.id);
+
+      if (error) {
+        toast.error('Failed to update festival banner');
+        setFestivalUploading(false);
+        return;
+      }
+      toast.success('Festival banner updated successfully');
+    } else {
+      const { error } = await supabase
+        .from('festival_banners')
+        .insert(festivalData);
+
+      if (error) {
+        toast.error('Failed to add festival banner');
+        setFestivalUploading(false);
+        return;
+      }
+      toast.success('Festival banner added successfully');
+    }
+
+    setFestivalUploading(false);
+    setFestivalDialogOpen(false);
+    resetFestivalForm();
+    fetchData();
+  };
+
+  const handleDeleteFestival = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this festival banner?')) return;
+
+    const { error } = await supabase.from('festival_banners').delete().eq('id', id);
+
+    if (error) {
+      toast.error('Failed to delete festival banner');
+      return;
+    }
+
+    toast.success('Festival banner deleted successfully');
+    fetchData();
+  };
+
+  const toggleFestivalActive = async (id: string, isActive: boolean) => {
+    const { error } = await supabase
+      .from('festival_banners')
+      .update({ is_active: isActive })
+      .eq('id', id);
+
+    if (error) {
+      toast.error('Failed to update festival banner');
+      return;
+    }
+    fetchData();
+  };
+
   const formatPrice = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -747,6 +934,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="delivery" className="data-[state=active]:bg-gold data-[state=active]:text-background">
               <Truck className="w-4 h-4 mr-1" />
               Delivery
+            </TabsTrigger>
+            <TabsTrigger value="festival" className="data-[state=active]:bg-gold data-[state=active]:text-background">
+              <PartyPopper className="w-4 h-4 mr-1" />
+              Festival
             </TabsTrigger>
           </TabsList>
 
@@ -1497,6 +1688,164 @@ const AdminDashboard = () => {
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Festival Banners Tab */}
+          <TabsContent value="festival">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-display text-cream">Festival Banners</h2>
+              <Dialog open={festivalDialogOpen} onOpenChange={(open) => {
+                setFestivalDialogOpen(open);
+                if (!open) resetFestivalForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button variant="gold">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Festival Banner
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-card border-gold/20 max-w-lg max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-cream font-display">
+                      {editingFestival ? 'Edit Festival Banner' : 'Add Festival Banner'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmitFestival} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-cream">Banner Image *</Label>
+                      <input
+                        ref={festivalFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFestivalImageSelect}
+                        className="hidden"
+                      />
+                      
+                      {festivalImagePreview ? (
+                        <div className="relative">
+                          <img
+                            src={festivalImagePreview}
+                            alt="Preview"
+                            className="w-full h-48 object-cover rounded-lg border border-gold/20"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={removeFestivalImage}
+                            className="absolute top-2 right-2 h-8 w-8 p-0 bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => festivalFileInputRef.current?.click()}
+                          className="h-48 border-2 border-dashed border-gold/30 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gold/50 transition-colors"
+                        >
+                          <Upload className="w-10 h-10 text-gold/50 mb-2" />
+                          <p className="text-sm text-muted-foreground">Click to upload banner image</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-cream">Alt Text</Label>
+                      <Input
+                        value={festivalForm.alt_text}
+                        onChange={(e) => setFestivalForm({ ...festivalForm, alt_text: e.target.value })}
+                        placeholder="Festival Banner"
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-cream">Link URL (optional)</Label>
+                      <Input
+                        value={festivalForm.link_url}
+                        onChange={(e) => setFestivalForm({ ...festivalForm, link_url: e.target.value })}
+                        placeholder="/shop"
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-cream">Display Order</Label>
+                      <Input
+                        type="number"
+                        value={festivalForm.display_order}
+                        onChange={(e) => setFestivalForm({ ...festivalForm, display_order: parseInt(e.target.value) || 0 })}
+                        className="bg-muted border-gold/20 text-cream"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        checked={festivalForm.is_active}
+                        onCheckedChange={(checked) => setFestivalForm({ ...festivalForm, is_active: checked })}
+                      />
+                      <Label className="text-cream">Active</Label>
+                    </div>
+                    <Button type="submit" variant="gold" className="w-full" disabled={festivalUploading}>
+                      {festivalUploading ? 'Uploading...' : editingFestival ? 'Update Banner' : 'Add Banner'}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading...</div>
+            ) : festivalBanners.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <PartyPopper className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No festival banners yet. Add your first banner!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {festivalBanners.map((banner) => (
+                  <div 
+                    key={banner.id} 
+                    className="bg-card border border-gold/10 rounded-lg overflow-hidden"
+                  >
+                    <img
+                      src={banner.image_url}
+                      alt={banner.alt_text}
+                      className="w-full h-40 object-cover"
+                    />
+                    <div className="p-4">
+                      <p className="text-cream font-display text-sm truncate">{banner.alt_text}</p>
+                      {banner.link_url && (
+                        <p className="text-muted-foreground text-xs truncate">{banner.link_url}</p>
+                      )}
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={banner.is_active}
+                            onCheckedChange={(checked) => toggleFestivalActive(banner.id, checked)}
+                          />
+                          <span className={`text-xs ${banner.is_active ? 'text-green-400' : 'text-muted-foreground'}`}>
+                            {banner.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditFestival(banner)}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteFestival(banner.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
